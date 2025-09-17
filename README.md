@@ -1,309 +1,232 @@
-# Dogs vs Cats Voting App Demo
+# Dogs vs Cats Voting App - KRO Implementation
 
-A complete Kubernetes-native voting application demo using KRO (Kubernetes Resource Orchestrator) and ACK (AWS Controllers for Kubernetes) that deploys on existing EKS clusters.
+A cloud-native voting application built with Kubernetes Resource Orchestrator (KRO) that demonstrates modern application deployment patterns on Amazon EKS with AWS Load Balancer Controller (ALB) and AWS Controllers for Kubernetes (ACK).
 
-## Overview
+## Architecture Overview
 
-This demo showcases how to deploy a full-stack voting application with AWS infrastructure using only Kubernetes manifests - no Terraform or shell scripts required!
+This application consists of:
+- **Vote App**: Frontend for casting votes (Python/Flask)
+- **Result App**: Real-time results display (Node.js)
+- **Worker App**: Vote processor (Java)
+- **Database**: PostgreSQL for vote storage and Redis for caching
+- **Infrastructure**: ALB ingresses, ACM certificates, Route53 DNS
 
-### What Gets Deployed
-
-- **Vote App**: Frontend for casting votes (`vote.dogsvscats.us`)
-- **Result App**: Real-time results display (`result.dogsvscats.us`) 
-- **Worker App**: Background vote processor
-- **PostgreSQL**: RDS database for vote storage
-- **Redis**: ElastiCache for vote queuing
-- **SSL Certificate**: ACM certificate with automatic validation
-- **DNS Records**: Route53 records for vote and result domains
-- **Load Balancer**: ALB with SSL termination
-
-## Architecture
+## Repository Structure
 
 ```
-Internet
-    │
-    ├── vote.dogsvscats.us ──┐
-    └── result.dogsvscats.us ─┼── ALB (SSL) ──┐
-                              │               │
-                              │               ├── Vote Service
-                              │               └── Result Service
-                              │                       │
-                              └── Worker ─────────────┤
-                                     │                │
-                              ┌──────┴──────┐        │
-                              │    Redis    │        │
-                              │ (ElastiCache)│        │
-                              └─────────────┘        │
-                                     │                │
-                              ┌──────┴──────┐        │
-                              │ PostgreSQL  │────────┘
-                              │    (RDS)    │
-                              └─────────────┘
+dogsvscatsapp/
+├── app-instance.yaml                  # Main application instance
+└── resourcegraphdefinitions/
+    ├── nested-app-rg.yaml             # Top-level ResourceGraphDefinition
+    └── components/
+        ├── database-rg.yaml           # PostgreSQL + Redis
+        ├── vote-app-rg.yaml           # Vote frontend
+        ├── result-app-rg.yaml         # Results display
+        ├── worker-app-rg.yaml         # Vote processor
+        └── ssl-domain-rg.yaml         # ALB + ACM + Route53
 ```
 
 ## Prerequisites
 
-- ✅ Existing EKS cluster (1.28+)
-- ✅ kubectl configured for your cluster
-- ✅ Route53 hosted zone for `dogsvscats.us`
-- ✅ Required ACK controllers installed:
-  - ACM Controller
-  - Route53 Controller  
+### Required AWS Resources
+- EKS cluster with OIDC provider
+- VPC with public/private subnets
+- Route53 hosted zone (for HTTPS/domain setup)
+
+### Required Kubernetes Components
+- [KRO (Kubernetes Resource Orchestrator)](https://kro.run)
+- [AWS Load Balancer Controller](https://kubernetes-sigs.github.io/aws-load-balancer-controller/)
+- [AWS Controllers for Kubernetes (ACK)](https://aws-controllers-k8s.github.io/community/)
   - EC2 Controller
   - RDS Controller
   - ElastiCache Controller
-- ✅ KRO (Kubernetes Resource Orchestrator) installed
-- ✅ AWS Load Balancer Controller installed
+  - Route53 Controller
+  - ACM Controller
 
 ## Quick Start
 
-### Step 1: Configure Your Infrastructure
+### 1. Deploy ResourceGraphDefinitions
 
-Edit `voting-app-config.yaml` with your AWS infrastructure details:
+```bash
+# Deploy all component definitions
+kubectl apply -f resourcegraphdefinitions/components/
+
+# Deploy the main nested application definition
+kubectl apply -f resourcegraphdefinitions/nested-app-rg.yaml
+```
+
+### 2. Configure Your Instance
+
+Edit `app-instance.yaml` with your AWS-specific values:
 
 ```yaml
-data:
-  # Your Route53 hosted zone ID
-  hostedZoneId: "Z0362187GFK6MIGB8GOB"
+apiVersion: kro.run/v1alpha1
+kind: DogsvsCatsApp
+metadata:
+  name: dogsvscats-voting-app
+  namespace: default
+spec:
+  name: dogsvscats-voting-app
+  namespace: default
   
-  # Your domain (must match your hosted zone)
-  baseDomain: "dogsvscats.us"
+  # Your AWS Infrastructure
+  vpcID: "vpc-xxxxxxxxx"
+  subnetIDs: ["subnet-xxxxxxxx", "subnet-yyyyyyyy", "subnet-zzzzzzzz"]
   
-  # Your EKS cluster's VPC ID
-  vpcId: "vpc-0123456789abcdef0"
+  # Domain Configuration (optional)
+  domain:
+    enabled: true
+    hostedZoneId: "ZXXXXXXXXXXXXX"
+    baseDomain: "yourdomain.com"
   
-  # Your EKS cluster's subnet IDs (comma-separated)
-  subnetIds: "subnet-0123456789abcdef0,subnet-0fedcba9876543210"
+  # Feature Flags
+  acm:
+    enabled: true    # Set to false for HTTP-only
+  ingress:
+    enabled: true
+  service:
+    enabled: true
   
-  # AWS region
-  awsRegion: "us-west-2"
-  
-  # Your EKS cluster name
-  clusterName: "my-cluster"
+  # Application Images
+  voteImage: "dockersamples/examplevotingapp_vote"
+  resultImage: "dockersamples/examplevotingapp_result"
+  workerImage: "dockersamples/examplevotingapp_worker"
 ```
 
-### Step 2: Deploy the Application
+### 3. Deploy the Application
 
 ```bash
-# Apply the configuration
-kubectl apply -f voting-app-config.yaml
-
-# Deploy the ResourceGraph definition
-kubectl apply -f voting-app-rg.yaml
-
-# Deploy the VotingApp instance
-kubectl apply -f voting-app-instance.yaml
+kubectl apply -f app-instance.yaml
 ```
 
-### Step 3: Monitor Deployment
+## Monitoring Deployment
+
+### Check Overall Status
 
 ```bash
-# Watch the VotingApp status
-kubectl get votingapp dogsvscats-voting-app -w
-
-# Check all created resources
-kubectl get certificate,recordset,dbinstance,securitygroup,deployment,service,ingress
-
-# Monitor KRO controller logs
-kubectl logs -l app.kubernetes.io/name=kro-controller-manager -n kro-system -f
+kubectl get dogsvscatsapp dogsvscats-voting-app -o yaml
 ```
 
-### Step 4: Access the Application
+### Monitor Individual Components
 
-Once deployed (5-10 minutes), access your voting app:
+```bash
+# Check all related resources
+kubectl get votingdatabase,voteapp,resultapp,workerapp,ssldomain
 
-- **Vote**: https://vote.dogsvscats.us
-- **Results**: https://result.dogsvscats.us
+# Check pods
+kubectl get pods -l app.kubernetes.io/part-of=dogsvscats-voting-app
 
-## Files Description
+# Check services and ingresses
+kubectl get svc,ingress -l app.kubernetes.io/part-of=dogsvscats-voting-app
+```
 
-- `README.md` - This documentation
-- `voting-app-config.yaml` - Customer configuration (edit this!)
-- `voting-app-rg.yaml` - ResourceGraph definition (KRO template)
-- `voting-app-instance.yaml` - VotingApp instance (triggers deployment)
+### Check ALB Status
 
-## Configuration Details
+```bash
+# View ALB ingresses
+kubectl get ingress
 
-### Required Configuration
-
-Update these values in `voting-app-config.yaml`:
-
-| Field | Description | Example |
-|-------|-------------|---------|
-| `hostedZoneId` | Route53 hosted zone ID | `Z0362187GFK6MIGB8GOB` |
-| `baseDomain` | Your domain name | `dogsvscats.us` |
-| `vpcId` | EKS cluster VPC ID | `vpc-0123456789abcdef0` |
-| `subnetIds` | Comma-separated subnet IDs | `subnet-abc,subnet-def` |
-| `awsRegion` | AWS region | `us-west-2` |
-| `clusterName` | EKS cluster name | `my-cluster` |
-
-### Optional Configuration
-
-These have sensible defaults but can be customized:
-
-| Field | Default | Description |
-|-------|---------|-------------|
-| `voteImage` | `dockersamples/examplevotingapp_vote` | Vote app container image |
-| `resultImage` | `dockersamples/examplevotingapp_result` | Result app container image |
-| `workerImage` | `dockersamples/examplevotingapp_worker` | Worker container image |
-| `dbInstanceClass` | `db.t3.micro` | RDS instance type |
-| `cacheNodeType` | `cache.t3.micro` | ElastiCache node type |
-
-## How It Works
-
-### 1. ConfigMap-Driven Configuration
-Instead of hardcoded values, all infrastructure details are read from a ConfigMap that customers edit.
-
-### 2. KRO Resource Orchestration
-KRO reads the ResourceGraph definition and creates all AWS resources in the correct order with proper dependencies.
-
-### 3. ACK Controllers
-AWS Controllers for Kubernetes manage the actual AWS resources (RDS, ElastiCache, ACM, Route53) as Kubernetes resources.
-
-### 4. Automatic DNS & SSL
-- ACM certificate is automatically created and validated
-- Route53 records point to the ALB
-- SSL termination at the load balancer
+# Check ALB controller logs
+kubectl logs -n kube-system deployment/aws-load-balancer-controller
+```
 
 ## Troubleshooting
 
 ### Common Issues
 
-**VotingApp stuck in pending state:**
-```bash
-# Check KRO controller logs
-kubectl logs -l app.kubernetes.io/name=kro-controller-manager -n kro-system
+#### 1. ACM Certificate Stuck in "Pending Validation"
 
-# Check individual resource status
-kubectl describe certificate dogsvscats-certificate
-kubectl describe dbinstance dogsvscats-postgres
+```bash
+# Check Route53 validation records
+kubectl get route53record
+
+# Verify hosted zone configuration
+aws route53 list-hosted-zones
 ```
 
-**DNS not resolving:**
-```bash
-# Check Route53 records were created
-kubectl get recordset
+#### 2. ALB Not Creating
 
-# Test DNS resolution
-dig vote.dogsvscats.us
-dig result.dogsvscats.us
+```bash
+# Check subnet tags (required for ALB)
+aws ec2 describe-subnets --subnet-ids subnet-xxxxxxxx
+
+# Required tags:
+# kubernetes.io/role/elb=1 (public subnets)
+# kubernetes.io/role/internal-elb=1 (private subnets)
 ```
 
-**SSL certificate issues:**
-```bash
-# Check certificate status
-kubectl get certificate -o yaml
+#### 3. Database Connection Issues
 
-# Check validation records
-kubectl get recordset -o yaml | grep validation
-```
-
-**Database connection issues:**
 ```bash
 # Check RDS instance status
-kubectl get dbinstance dogsvscats-postgres -o yaml
+kubectl get rdsinstance
 
-# Check security group rules
-kubectl get securitygroup -o yaml
+# Check security groups allow traffic on port 5432/6379
+kubectl describe rdsinstance
+kubectl describe elasticacheuser
 ```
 
-### Useful Commands
+#### 4. Pods Not Starting
 
 ```bash
-# Get overall status
-kubectl get votingapp dogsvscats-voting-app -o yaml
+# Check pod logs
+kubectl logs -l app=vote-app
+kubectl logs -l app=result-app
+kubectl logs -l app=worker-app
 
-# List all created AWS resources
-kubectl get certificate,recordset,dbinstance,cachecluster,securitygroup
+# Check resource quotas
+kubectl describe resourcequota
+```
 
-# Check application pods
-kubectl get pods -l app.kubernetes.io/part-of=dogsvscats-voting-app
+### Debug Commands
 
-# View application logs
-kubectl logs -l app=vote
-kubectl logs -l app=result
-kubectl logs -l app=worker
+```bash
+# Get detailed status of main resource
+kubectl describe dogsvscatsapp dogsvscats-voting-app
 
-# Check ingress status
-kubectl get ingress -o wide
+# Check KRO controller logs
+kubectl logs -n kro-system deployment/kro-controller-manager
 
-# Monitor ALB creation
-kubectl describe ingress vote-ingress
-kubectl describe ingress result-ingress
+# Check ACK controller logs
+kubectl logs -n ack-system deployment/ack-ec2-controller
+kubectl logs -n ack-system deployment/ack-rds-controller
 ```
 
 ## Cleanup
 
-To remove all resources:
-
 ```bash
-# Delete the VotingApp instance (this triggers cleanup of all AWS resources)
-kubectl delete votingapp dogsvscats-voting-app
+# Delete the application instance
+kubectl delete -f app-instance.yaml
 
-# Wait for cleanup to complete (may take 5-10 minutes)
-kubectl get certificate,recordset,dbinstance,cachecluster,securitygroup
-
-# Optional: Remove the ResourceGraph definition
-kubectl delete resourcegraphdefinition voting-app.kro.run
-
-# Optional: Remove the ConfigMap
-kubectl delete configmap voting-app-config
+# Wait for resources to be cleaned up, then remove definitions
+kubectl delete -f resourcegraphdefinitions/
 ```
 
-## Demo Script
+## Advanced Configuration
 
-For presenting this demo:
+### Custom Resource Sizing
 
-### Setup (2 minutes)
-1. Show the ConfigMap with customer values
-2. Explain the three-file approach
-
-### Deploy (1 minute)
-```bash
-kubectl apply -f voting-app-config.yaml
-kubectl apply -f voting-app-rg.yaml  
-kubectl apply -f voting-app-instance.yaml
+```yaml
+spec:
+  voteReplicas: 3
+  resultReplicas: 2
+  workerReplicas: 2
 ```
 
-### Monitor (5-8 minutes)
-```bash
-# Watch resources being created
-kubectl get votingapp dogsvscats-voting-app -w
+### Custom Images
 
-# Show AWS resources appearing
-watch "kubectl get certificate,recordset,dbinstance,securitygroup"
+```yaml
+spec:
+  voteImage: "your-registry/vote:v1.0"
+  resultImage: "your-registry/result:v1.0"
+  workerImage: "your-registry/worker:v1.0"
 ```
 
-### Demo (5 minutes)
-1. Visit https://vote.dogsvscats.us
-2. Cast some votes
-3. Visit https://result.dogsvscats.us
-4. Show real-time results
+## Contributing
 
-### Explain (10 minutes)
-1. Show created AWS resources in console
-2. Explain KRO orchestration
-3. Show ACK controller management
-4. Discuss benefits vs Terraform/CloudFormation
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test with a real EKS cluster
+5. Submit a pull request
 
-### Cleanup (1 minute)
-```bash
-kubectl delete votingapp dogsvscats-voting-app
-```
-
-## Benefits of This Approach
-
-- ✅ **Kubernetes-Native**: Everything managed through kubectl
-- ✅ **No Scripts**: Pure YAML configuration
-- ✅ **Declarative**: Desired state management
-- ✅ **Portable**: Works on any EKS cluster
-- ✅ **GitOps Ready**: All configuration in version control
-- ✅ **Clean Separation**: Infrastructure config vs application logic
-- ✅ **Dependency Management**: KRO handles resource ordering
-- ✅ **Automatic Cleanup**: Delete one resource, cleanup everything
-
-## Support
-
-- **KRO Documentation**: https://kro.run
-- **ACK Documentation**: https://aws-controllers-k8s.github.io/community/
-- **AWS Load Balancer Controller**: https://kubernetes-sigs.github.io/aws-load-balancer-controller/

@@ -1,0 +1,28 @@
+apiVersion: kro.run/v1alpha1
+kind: DogsvsCatsApp
+metadata:
+  name: dogsvscats-voting-app
+  namespace: default
+spec:
+  name: dogsvscats-voting-app
+  namespace: default
+  # Infrastructure values
+  vpcID: "vpc-0913cce0de7289510"
+  subnetIDs: ["subnet-0a2b4abae7c475124", "subnet-0602d3aa50ee4455f", "subnet-0d98758f7f26e93a4"]
+  # Domain configuration
+  domain:
+    enabled: true
+    hostedZoneId: "Z0362187GFK6MIGB8GOB"
+    baseDomain: "dogsvscats.us"
+  # Feature flags
+  acm:
+    enabled: true  # Start with SSL disabled for testing
+  ingress:
+    enabled: true  # Start with ingress disabled for testing
+  # Application configuration
+  voteImage: "dogsvscats/vote:amd64-final"
+  resultImage: "dogsvscats/result:amd64-final"
+  workerImage: "dogsvscats/worker:amd64-final"
+  voteReplicas: 2
+  resultReplicas: 1
+  workerReplicas: 1

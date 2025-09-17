@@ -38,6 +38,8 @@ dogsvscatsapp/
 - [AWS Load Balancer Controller](https://kubernetes-sigs.github.io/aws-load-balancer-controller/)
 - [AWS Controllers for Kubernetes (ACK)](https://aws-controllers-k8s.github.io/community/)
   - EC2 Controller
+  - EKS Controller
+  - IAM Controller
   - RDS Controller
   - ElastiCache Controller
   - Route53 Controller

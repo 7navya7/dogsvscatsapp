@@ -39,14 +39,15 @@ spec:
       voteReplicas: ${voteapp.status.availableReplicas}
       resultReplicas: ${resultapp.status.availableReplicas}
       workerReplicas: ${workerapp.status.availableReplicas}
-      postgresEndpoint: ${database.status.postgresEndpoint | optional}
-      redisEndpoint: ${database.status.redisEndpoint | optional}
+      postgresEndpoint: ${database.status.postgresEndpoint}
+      redisEndpoint: ${database.status.redisEndpoint}
 
   resources:
   # --- Database Infrastructure ---
   - id: database
     readyWhen:
       - ${has(database.status) || true}
+      - "${has(database.status.postgresEndpoint) && has(database.status.redisEndpoint)}"
     template:
       apiVersion: kro.run/v1alpha1
       kind: VotingDatabase
@@ -68,6 +69,7 @@ spec:
     readyWhen:
       - ${has(voteapp.status.availableReplicas)}
       - ${voteapp.status.availableReplicas > 0}
+      
     template:
       apiVersion: kro.run/v1alpha1
       kind: VoteApp
@@ -79,7 +81,7 @@ spec:
         namespace: ${schema.spec.namespace}
         image: ${schema.spec.voteImage}
         replicas: ${schema.spec.voteReplicas}
-        redisEndpoint: ${database.status.redisEndpoint | optional}
+        redisEndpoint: ${database.status.redisEndpoint}
         service:
           enabled: ${schema.spec.service.enabled}
 
@@ -88,6 +90,7 @@ spec:
     readyWhen:
       - ${has(resultapp.status.availableReplicas)}
       - ${resultapp.status.availableReplicas > 0}
+      
     template:
       apiVersion: kro.run/v1alpha1
       kind: ResultApp
@@ -99,8 +102,8 @@ spec:
         namespace: ${schema.spec.namespace}
         image: ${schema.spec.resultImage}
         replicas: ${schema.spec.resultReplicas}
-        postgresEndpoint: ${database.status.postgresEndpoint | optional}
-        postgresSecretName: ${database.status.postgresSecretName | optional}
+        postgresEndpoint: ${database.status.postgresEndpoint}
+        postgresSecretName: ${database.status.postgresSecretName}
         service:
           enabled: ${schema.spec.service.enabled}
 
@@ -109,6 +112,7 @@ spec:
     readyWhen:
       - ${has(workerapp.status.availableReplicas)}
       - ${workerapp.status.availableReplicas > 0}
+      
     template:
       apiVersion: kro.run/v1alpha1
       kind: WorkerApp
@@ -120,9 +124,9 @@ spec:
         namespace: ${schema.spec.namespace}
         image: ${schema.spec.workerImage}
         replicas: ${schema.spec.workerReplicas}
-        redisEndpoint: ${database.status.redisEndpoint | optional}
-        postgresEndpoint: ${database.status.postgresEndpoint | optional}
-        postgresSecretName: ${database.status.postgresSecretName | optional}
+        redisEndpoint: ${database.status.redisEndpoint}
+        postgresEndpoint: ${database.status.postgresEndpoint}
+        postgresSecretName: ${database.status.postgresSecretName}
 
   # --- SSL and Domain Management ---
   - id: ssldomain
@@ -132,6 +136,8 @@ spec:
     readyWhen:
       - ${has(ssldomain.status.voteCertificateArn)}
       - ${has(ssldomain.status.resultCertificateArn)}
+      - ${has(ssldomain.status.voteIngressHostname)}
+      - ${has(ssldomain.status.resultIngressHostname)}
     template:
       apiVersion: kro.run/v1alpha1
       kind: SslDomain

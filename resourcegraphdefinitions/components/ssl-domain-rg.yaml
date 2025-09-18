@@ -21,8 +21,8 @@ spec:
     status:
       voteCertificateArn: ${acmcertificate.status.ackResourceMetadata.arn}
       resultCertificateArn: ${resultcertificate.status.ackResourceMetadata.arn}
-      voteIngressHostname: ${voteingress.status.loadBalancer.ingress[0].hostname}
-      resultIngressHostname: ${resultingress.status.loadBalancer.ingress[0].hostname}
+      voteIngressHostname: ${voteingress.status.loadBalancer.ingress}
+      resultIngressHostname: ${resultingress.status.loadBalancer.ingress}
 
   resources:
   # --- ACM Certificate for Vote ---
@@ -30,7 +30,7 @@ spec:
     includeWhen:
       - ${schema.spec.acm.enabled}
     readyWhen:
-      - ${has(acmcertificate.status.domainValidations)}
+      - "${has(acmcertificate.status.ackResourceMetadata.arn)}"
     template:
       apiVersion: acm.services.k8s.aws/v1alpha1
       kind: Certificate
@@ -48,7 +48,7 @@ spec:
     includeWhen:
       - ${schema.spec.acm.enabled}
     readyWhen:
-      - ${has(resultcertificate.status.domainValidations)}
+      - "${has(resultcertificate.status.ackResourceMetadata.arn)}"
     template:
       apiVersion: acm.services.k8s.aws/v1alpha1
       kind: Certificate
@@ -66,7 +66,7 @@ spec:
     includeWhen:
       - ${schema.spec.acm.enabled}
     readyWhen:
-      - ${has(route53validation.status.ackResourceMetadata)}
+      - "${has(route53validation.status.ackResourceMetadata)}"
     template:
       apiVersion: route53.services.k8s.aws/v1alpha1
       kind: RecordSet
@@ -86,7 +86,7 @@ spec:
     includeWhen:
       - ${schema.spec.acm.enabled}
     readyWhen:
-      - ${has(resultvalidation.status.ackResourceMetadata)}
+      - "${has(resultvalidation.status.ackResourceMetadata)}"
     template:
       apiVersion: route53.services.k8s.aws/v1alpha1
       kind: RecordSet
@@ -182,7 +182,7 @@ spec:
     includeWhen:
       - ${schema.spec.ingress.enabled}
     readyWhen:
-      - ${has(votednsrecord.status.ackResourceMetadata)}
+      - "${has(votednsrecord.status.ackResourceMetadata)}"
     template:
       apiVersion: route53.services.k8s.aws/v1alpha1
       kind: RecordSet
@@ -201,7 +201,7 @@ spec:
     includeWhen:
       - ${schema.spec.ingress.enabled}
     readyWhen:
-      - ${has(resultdnsrecord.status.ackResourceMetadata)}
+      - "${has(resultdnsrecord.status.ackResourceMetadata)}"
     template:
       apiVersion: route53.services.k8s.aws/v1alpha1
       kind: RecordSet

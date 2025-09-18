@@ -16,9 +16,9 @@ spec:
       redis:
         enabled: boolean | default=true
     status:
-      postgresEndpoint: ${postgresinstance.status.endpoint.address | optional}
-      redisEndpoint: ${redisserverless.status.endpoint.address | optional}
-      postgresSecretName: ${postgrespassword.metadata.name | optional}
+      postgresEndpoint: ${postgresinstance.status.endpoint.address}
+      redisEndpoint: ${redisserverless.status.endpoint.address}
+      postgresSecretName: ${postgrespassword.metadata.name}
 
   resources:
   # --- PostgreSQL Resources ---
@@ -154,4 +154,4 @@ spec:
             maximum: 1000
         subnetIDs: ${schema.spec.subnetIDs}
         securityGroupIDs:
-        - ${redissecuritygroup.status.id}
+        userGroupId: "default"        - ${redissecuritygroup.status.id}

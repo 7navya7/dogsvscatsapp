@@ -26,9 +26,9 @@ spec:
   postgres:
     enabled: true
   # Application configuration
-  voteImage: "dogsvscats/vote:amd64-final"
-  resultImage: "dogsvscats/result:amd64-final"
-  workerImage: "dogsvscats/worker:amd64-final"
+  voteImage: "dogsvscats/vote:latest"
+  resultImage: "dogsvscats/result:latest"
+  workerImage: "dogsvscats/worker:latest"
   voteReplicas: 2
   resultReplicas: 1
   workerReplicas: 1

@@ -140,41 +140,30 @@ kubectl logs -n kube-system deployment/aws-load-balancer-controller
 
 ```bash
 # Check Route53 validation records
-kubectl get route53record
+kubectl get recordset
 
 # Verify hosted zone configuration
 aws route53 list-hosted-zones
 ```
 
-#### 2. ALB Not Creating
-
-```bash
-# Check subnet tags (required for ALB)
-aws ec2 describe-subnets --subnet-ids subnet-xxxxxxxx
-
-# Required tags:
-# kubernetes.io/role/elb=1 (public subnets)
-# kubernetes.io/role/internal-elb=1 (private subnets)
-```
-
-#### 3. Database Connection Issues
+#### 2. Database Connection Issues
 
 ```bash
 # Check RDS instance status
-kubectl get rdsinstance
+kubectl get dbinstance
 
 # Check security groups allow traffic on port 5432/6379
-kubectl describe rdsinstance
-kubectl describe elasticacheuser
+kubectl describe dbinstance
+kubectl describe serverlesscache
 ```
 
-#### 4. Pods Not Starting
+#### 3. Pods Not Starting
 
 ```bash
 # Check pod logs
-kubectl logs -l app=vote-app
-kubectl logs -l app=result-app
-kubectl logs -l app=worker-app
+kubectl logs -l app=dogsvscats-voting-app-vote
+kubectl logs -l app=dogsvscats-voting-app-result
+kubectl logs -l app=dogsvscats-voting-app-worker
 
 # Check resource quotas
 kubectl describe resourcequota

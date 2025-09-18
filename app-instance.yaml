@@ -19,6 +19,12 @@ spec:
     enabled: true  # Start with SSL disabled for testing
   ingress:
     enabled: true  # Start with ingress disabled for testing
+  service:
+    enabled: true
+  redis:
+    enabled: true
+  postgres:
+    enabled: true
   # Application configuration
   voteImage: "dogsvscats/vote:amd64-final"
   resultImage: "dogsvscats/result:amd64-final"
